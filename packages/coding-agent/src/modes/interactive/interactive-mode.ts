@@ -1075,7 +1075,10 @@ export class InteractiveMode {
 		onThemeChange(() => {
 			this.ui.invalidate();
 			this.updateEditorBorderColor();
-			this.ui.requestRender();
+			// Force a full redraw. A theme swap changes the colors of every
+			// already-rendered line, including the transcript that scrolled above the
+			// viewport, and the differential renderer cannot repaint those cells.
+			this.ui.requestRender(true);
 		});
 
 		// Set up git branch watcher (uses provider instead of footer)
