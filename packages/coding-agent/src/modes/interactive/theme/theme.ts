@@ -763,9 +763,16 @@ export function initTheme(themeName?: string, enableWatcher: boolean = false): v
 		}
 	} catch (_error) {
 		// Theme is invalid - fall back to the system theme silently
-		currentThemeName = SYSTEM_THEME_NAME;
 		setGlobalTheme(loadTheme(SYSTEM_THEME_NAME));
-		// Don't start watcher for fallback theme
+		if (enableWatcher && isWatchableTheme(name)) {
+			// Keep watching the requested custom theme: a file that appears or is fixed
+			// after startup should still take effect instead of leaving the fallback active.
+			currentThemeName = name;
+			startThemeWatcher();
+		} else {
+			// Don't start watcher for fallback theme
+			currentThemeName = SYSTEM_THEME_NAME;
+		}
 	}
 }
 
@@ -782,9 +789,16 @@ export function setTheme(name: string, enableWatcher: boolean = false): { succes
 		return { success: true };
 	} catch (error) {
 		// Theme is invalid - fall back to the system theme
-		currentThemeName = SYSTEM_THEME_NAME;
 		setGlobalTheme(loadTheme(SYSTEM_THEME_NAME));
-		// Don't start watcher for fallback theme
+		if (enableWatcher && isWatchableTheme(name)) {
+			// Keep watching the requested custom theme: a file that appears or is fixed
+			// after startup should still take effect instead of leaving the fallback active.
+			currentThemeName = name;
+			startThemeWatcher();
+		} else {
+			// Don't start watcher for fallback theme
+			currentThemeName = SYSTEM_THEME_NAME;
+		}
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : String(error),
@@ -805,16 +819,15 @@ export function onThemeChange(callback: () => void): void {
 	onThemeChangeCallback = callback;
 }
 
+function isWatchableTheme(themeName: string | undefined): themeName is string {
+	return !!themeName && themeName !== "dark" && themeName !== "light" && themeName !== SYSTEM_THEME_NAME;
+}
+
 function startThemeWatcher(): void {
 	stopThemeWatcher();
 
 	// Only watch if it's a custom theme (not built-in)
-	if (
-		!currentThemeName ||
-		currentThemeName === "dark" ||
-		currentThemeName === "light" ||
-		currentThemeName === SYSTEM_THEME_NAME
-	) {
+	if (!isWatchableTheme(currentThemeName)) {
 		return;
 	}
 
@@ -823,8 +836,9 @@ function startThemeWatcher(): void {
 	const watchedFileName = `${watchedThemeName}.json`;
 	const themeFile = path.join(customThemesDir, watchedFileName);
 
-	// Only watch if the file exists
-	if (!fs.existsSync(themeFile)) {
+	// Watch the directory even before the file exists, so a theme that appears or is
+	// fixed after startup still takes effect instead of leaving the fallback active.
+	if (!fs.existsSync(customThemesDir)) {
 		return;
 	}
 
